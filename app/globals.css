@@ -1,0 +1,131 @@
+@import 'tailwindcss';
+
+/*
+  Delivery Hero Slide System — global baseline.
+
+  The identity is deliberately spare: one red doing all the accent work,
+  white as the dominant surface, near-black body text, two optional greys.
+  Flat colour only — no shadows, no rounded cards. Radius is 0 by design.
+*/
+
+@theme inline {
+  /* ---- Brand palette (the only colours in the system) ---- */
+  --color-dh-red: #d82128; /* Pantone 1795 C — the single accent */
+  --color-dh-white: #ffffff; /* dominant surface */
+  --color-dh-black: #000000;
+  --color-dh-ink: #1a1a1a; /* near-black body text */
+  --color-dh-band: #f5f5f5; /* section bands */
+  --color-dh-muted: #8c8c8c; /* captions / footnotes */
+
+  /* ---- Semantic tokens (mapped onto the brand palette) ---- */
+  --color-background: var(--color-dh-white);
+  --color-foreground: var(--color-dh-ink);
+  --color-primary: var(--color-dh-red);
+  --color-primary-foreground: var(--color-dh-white);
+  --color-muted: var(--color-dh-band);
+  --color-muted-foreground: var(--color-dh-muted);
+  --color-border: var(--color-dh-ink);
+  --color-ring: var(--color-dh-red);
+
+  /* ---- Slots for borrowed primitives ----
+     shadcn/ui components reference these semantic names. Without them they
+     fall back to their own default greys and quietly break the palette, so
+     they are mapped onto brand tokens here. No new colours are introduced —
+     every value resolves to one of the six brand colours above. */
+  --color-card: var(--color-dh-white);
+  --color-card-foreground: var(--color-dh-ink);
+  --color-popover: var(--color-dh-white);
+  --color-popover-foreground: var(--color-dh-ink);
+  --color-secondary: var(--color-dh-band);
+  --color-secondary-foreground: var(--color-dh-ink);
+  --color-accent: var(--color-dh-band);
+  --color-accent-foreground: var(--color-dh-ink);
+  --color-destructive: var(--color-dh-red);
+  --color-destructive-foreground: var(--color-dh-white);
+  /* Band, not ink: `--input` drives control *fills* (e.g. `bg-input/50`) as
+     well as borders, so an ink value paints inputs near-black. Put ink on the
+     border explicitly where a hairline is wanted. */
+  --color-input: var(--color-dh-band);
+
+  /* ---- Flat by design: no radius, no shadow ----
+     `--radius: 0` on its own is not enough. Tailwind's `rounded-sm|md|lg|xl`
+     utilities read their own scale variables, which keep their default rem
+     values unless pinned, so any borrowed component arrives with rounded
+     corners. Collapsing the whole scale keeps the system square. */
+  --radius: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+
+  /* ---- Type ---- */
+  --font-sans:
+    var(--font-fira-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* ---- Slide geometry ----
+     Slides are designed on a 1280×720 (16:9) canvas. All slide typography is
+     expressed in container-query width units (cqw) so it scales with the slide,
+     never with the viewport. Margins are ~8% of slide width. */
+  --dh-margin-x: 8cqw;
+  --dh-margin-y: 7cqw;
+}
+
+/*
+  Slide type scale — expressed in cqw so a slide reads identically at any size.
+  Reference sizes are the spec's point sizes on a 1280px-wide slide:
+    title 44pt · section 32pt · body 18pt · caption 12pt · stat 100pt+
+  The heavy-vs-light weight contrast is a core part of the signature.
+*/
+@layer components {
+  .dh-title {
+    font-size: 4.6cqw; /* ~44pt @ 1280px */
+    font-weight: 900; /* Black */
+    line-height: 1.03;
+    letter-spacing: -0.02em;
+  }
+  .dh-section {
+    font-size: 3.35cqw; /* ~32pt */
+    font-weight: 800; /* Heavy */
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+  }
+  .dh-body {
+    font-size: 1.9cqw; /* ~18pt */
+    font-weight: 300; /* Light */
+    line-height: 1.5;
+  }
+  .dh-caption {
+    font-size: 1.25cqw; /* ~12pt */
+    font-weight: 400; /* Regular */
+    line-height: 1.35;
+  }
+  .dh-stat {
+    font-size: 11cqw; /* ~100pt+ */
+    font-weight: 900; /* Black */
+    line-height: 0.88;
+    letter-spacing: -0.03em;
+  }
+  .dh-eyebrow {
+    font-size: 1.3cqw;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    color-scheme: light;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
