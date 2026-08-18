@@ -18,7 +18,6 @@ export type OktaApp = {
   created?: string
   lastUpdated?: string
   clientId?: string
-  clientSecret?: string
   redirectUris: string[]
   postLogoutRedirectUris: string[]
   grantTypes: string[]
@@ -127,7 +126,7 @@ function mapApp(raw: RawApp): OktaApp {
     created: raw.created,
     lastUpdated: raw.lastUpdated,
     clientId: raw.credentials?.oauthClient?.client_id,
-    clientSecret: raw.credentials?.oauthClient?.client_secret,
+    // NB: Okta never returns client_secret here. Use getAppClientSecret().
     tokenEndpointAuthMethod: raw.credentials?.oauthClient?.token_endpoint_auth_method,
     redirectUris: oauth?.redirect_uris ?? [],
     postLogoutRedirectUris: oauth?.post_logout_redirect_uris ?? [],
@@ -139,10 +138,17 @@ function mapApp(raw: RawApp): OktaApp {
   }
 }
 
-/** Strips the client secret so it never leaves the server by accident. */
+/**
+ * Marks an app as safe to serialize to a client.
+ *
+ * `OktaApp` no longer carries a secret at all — Okta keeps secrets in a
+ * separate collection reachable only via `getAppClientSecret`. This stays as
+ * the single, explicit boundary every response passes through, so if a
+ * sensitive field is ever added to the type there is one obvious place to
+ * strip it.
+ */
 export function redactApp(app: OktaApp): OktaApp {
-  const { clientSecret, ...rest } = app
-  return { ...rest, clientSecret: clientSecret ? "••••••••" : undefined }
+  return app
 }
 
 /* ---------------------------------------------------------------------- */
@@ -159,6 +165,26 @@ export async function listApps(options: { query?: string; limit?: number } = {})
 export async function getApp(id: string): Promise<OktaApp> {
   const { data } = await oktaFetch<RawApp>(`/api/v1/apps/${encodeURIComponent(id)}`)
   return mapApp(data)
+}
+
+/**
+ * Reads an app's active client secret.
+ *
+ * Okta deliberately omits `client_secret` from the app object — GET /apps/{id}
+ * only ever returns the client_id — and serves secrets from a separate
+ * collection. An app may hold several; we want the ACTIVE one.
+ *
+ * Returns undefined for apps that legitimately have no secret (public clients,
+ * or private_key_jwt apps), which the caller must distinguish from an error.
+ */
+export async function getAppClientSecret(id: string): Promise<string | undefined> {
+  type RawSecret = { id: string; status?: string; client_secret?: string }
+  const { data } = await oktaFetch<RawSecret[]>(
+    `/api/v1/apps/${encodeURIComponent(id)}/credentials/secrets`,
+  )
+  const secrets = data ?? []
+  const active = secrets.find((s) => s.status === "ACTIVE" && s.client_secret)
+  return (active ?? secrets.find((s) => s.client_secret))?.client_secret
 }
 
 export type CreateAppInput = {

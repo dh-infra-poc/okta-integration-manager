@@ -29,9 +29,32 @@ export const updateAppSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
 })
 
-export const assignmentSchema = z.object({
-  id: z.string().trim().min(1, "An Okta id is required"),
-})
+/**
+ * Body for assigning a group or user to an app.
+ *
+ * The route already says which kind is meant (`/groups` vs `/users`), so the
+ * canonical field is just `id`. But `groupId`/`userId` is what an API caller
+ * naturally reaches for, so accept those too and normalize — rejecting them
+ * would be pedantry, not validation.
+ */
+export const assignmentSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    groupId: z.string().trim().min(1).optional(),
+    userId: z.string().trim().min(1).optional(),
+  })
+  .transform((v, ctx) => {
+    const id = v.id ?? v.groupId ?? v.userId
+    if (!id) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["id"],
+        message: "An Okta id is required (send id, groupId or userId)",
+      })
+      return z.NEVER
+    }
+    return { id }
+  })
 
 /**
  * A connector is created either from raw OIDC credentials or, more usefully,

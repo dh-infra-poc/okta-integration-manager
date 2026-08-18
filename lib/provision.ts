@@ -1,7 +1,7 @@
 import "server-only"
 
 import { ServiceError } from "@/lib/errors"
-import { getApp } from "@/lib/okta"
+import { getApp, getAppClientSecret } from "@/lib/okta"
 import type { CreateConnectorBody } from "@/lib/schema"
 import { createOAuthConnector, type Connector } from "@/lib/vercel"
 
@@ -16,15 +16,27 @@ export async function createConnectorFromInput(input: CreateConnectorBody): Prom
 
   if (input.oktaAppId) {
     const app = await getApp(input.oktaAppId)
-    if (!app.clientId || !app.clientSecret) {
+    if (!app.clientId) {
       throw new ServiceError(
         400,
         "okta_app_not_oidc",
-        `Okta app "${app.label}" has no OIDC client credentials, so it cannot back a connector`,
+        `Okta app "${app.label}" is not an OIDC client, so it cannot back a connector`,
       )
     }
+
+    // Okta never returns client_secret on the app object; it lives in a
+    // separate secrets collection and must be fetched explicitly.
+    const secret = await getAppClientSecret(input.oktaAppId)
+    if (!secret) {
+      throw new ServiceError(
+        400,
+        "okta_app_no_secret",
+        `Okta app "${app.label}" has no active client secret. Connect needs a confidential client — generate a secret on the app, or pass clientSecret explicitly.`,
+      )
+    }
+
     clientId = app.clientId
-    clientSecret = app.clientSecret
+    clientSecret = secret
     issuer = app.issuer
     // Group Connect connectors under the Okta org's hostname by default.
     service = service ?? (issuer ? new URL(issuer).hostname : "okta.com")

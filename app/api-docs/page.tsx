@@ -25,10 +25,10 @@ const GROUPS: Array<{ title: string; note: string; endpoints: Endpoint[] }> = [
     note: "Who can reach the application. Group assignment is the usual lever; user assignment is the exception.",
     endpoints: [
       { method: "GET", path: "/api/okta/apps/:appId/groups", summary: "List assigned groups" },
-      { method: "POST", path: "/api/okta/apps/:appId/groups", summary: "Assign a group by id" },
+      { method: "POST", path: "/api/okta/apps/:appId/groups", summary: "Assign a group — body { id } or { groupId }" },
       { method: "DELETE", path: "/api/okta/apps/:appId/groups/:groupId", summary: "Remove a group" },
       { method: "GET", path: "/api/okta/apps/:appId/users", summary: "List assigned users" },
-      { method: "POST", path: "/api/okta/apps/:appId/users", summary: "Assign a user by id" },
+      { method: "POST", path: "/api/okta/apps/:appId/users", summary: "Assign a user — body { id } or { userId }" },
       { method: "DELETE", path: "/api/okta/apps/:appId/users/:userId", summary: "Remove a user" },
       { method: "GET", path: "/api/okta/groups?q=", summary: "Search the group directory" },
       { method: "GET", path: "/api/okta/users?q=", summary: "Search the user directory" },
