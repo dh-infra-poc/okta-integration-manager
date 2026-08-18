@@ -15,10 +15,14 @@ const firaSans = Fira_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'Delivery Hero — Slide System',
+  title: {
+    default: 'Access Control Plane',
+    template: '%s — Access Control Plane',
+  },
   description:
-    'A spare, disciplined presentation design system: one red, white, black, one typeface.',
+    'Manage Okta applications and their assignments, the Vercel Connect connectors built from them, and the project Passport configurations they gate.',
   generator: 'v0.app',
+  robots: { index: false, follow: false },
 }
 
 export const viewport: Viewport = {
