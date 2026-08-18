@@ -8,7 +8,7 @@ import { TBody, TD, TH, THead, TR, Table } from "@/components/app/data-table"
 import { ConsoleShell } from "@/components/console/shell"
 import { EmptyState, Mono } from "@/components/console/states"
 import { Button } from "@/components/ui/button"
-import { configStatus } from "@/lib/env"
+import { configStatus, oktaAuthMode } from "@/lib/env"
 import { errorMessage } from "@/lib/errors"
 import { listApps } from "@/lib/okta"
 import { listConnectors, listProjects } from "@/lib/vercel"
@@ -33,6 +33,7 @@ export default async function OverviewPage() {
 
   const config = configStatus()
   const blocked = config.filter((c) => c.required && !c.present)
+  const authMode = oktaAuthMode()
 
   const gated = projects.value?.filter((p) => p.passport) ?? []
   const oidcConnectors = connectors.value?.filter((c) => c.type === "oauth") ?? []
@@ -91,7 +92,28 @@ export default async function OverviewPage() {
             <Badge variant="red">{blocked.length} missing</Badge>
           )}
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="flex flex-col gap-4 p-0">
+          <p className="max-w-[80ch] px-5 pt-5 text-sm font-[300] leading-relaxed text-dh-muted sm:px-6">
+            {authMode === "ssws" ? (
+              <>
+                Okta calls authenticate with a classic <Mono>SSWS</Mono> API token. Simplest to set up,
+                but the token is long-lived and inherits every permission of the admin account that
+                created it — issue it from a dedicated service account, and move to an API Services app
+                with <Mono>private_key_jwt</Mono> before this handles production access.
+              </>
+            ) : authMode === "jwt" ? (
+              <>
+                Okta calls authenticate with a signed <Mono>private_key_jwt</Mono> client assertion,
+                exchanged for a short-lived, scope-limited access token. This is the preferred mode.
+              </>
+            ) : (
+              <>
+                No Okta credential is configured. Set <Mono>OKTA_API_TOKEN</Mono> for the quickest path,
+                or <Mono>OKTA_CLIENT_ID</Mono> plus <Mono>OKTA_PRIVATE_JWK</Mono> for scoped, short-lived
+                tokens.
+              </>
+            )}
+          </p>
           <Table>
             <THead>
               <TR>

@@ -50,6 +50,25 @@ export const oktaClientId = () => read("OKTA_CLIENT_ID")
 export const oktaPrivateJwk = () => read("OKTA_PRIVATE_JWK")
 export const oktaApiToken = () => read("OKTA_API_TOKEN")
 
+/** A JWK we can actually sign with: present, parseable, and not a placeholder. */
+export function oktaJwkUsable(): boolean {
+  return Boolean(oktaClientId() && oktaPrivateJwk()) && !oktaJwkLooksPlaceholder()
+}
+
+/**
+ * How we will authenticate to the Okta Management API.
+ *
+ * `jwt` (private_key_jwt) wins when it is genuinely usable. A placeholder or
+ * unparseable JWK does NOT win — otherwise leftover scaffolding values would
+ * shadow a perfectly good SSWS token and the app would fail with a confusing
+ * signing error instead of just working.
+ */
+export function oktaAuthMode(): "jwt" | "ssws" | "none" {
+  if (oktaJwkUsable()) return "jwt"
+  if (oktaApiToken()) return "ssws"
+  return "none"
+}
+
 export const vercelApiToken = () => read("VERCEL_API_TOKEN")
 export const vercelTeamId = () => read("VERCEL_TEAM_ID")
 
@@ -64,7 +83,10 @@ export type ConfigCheck = {
 
 /** Which credentials are present. Never returns the values themselves. */
 export function configStatus(): ConfigCheck[] {
-  const hasJwk = Boolean(oktaClientId() && oktaPrivateJwk())
+  const mode = oktaAuthMode()
+  // In SSWS mode the JWT pair is simply unused, so it must not be reported as
+  // a missing requirement — only the credential we will actually send matters.
+  const usingSsws = mode === "ssws"
   return [
     {
       key: "OKTA_ORG_URL",
@@ -73,25 +95,31 @@ export function configStatus(): ConfigCheck[] {
       note: "Okta org base URL, e.g. https://acme.okta.com",
     },
     {
+      key: "OKTA_API_TOKEN",
+      present: Boolean(oktaApiToken()),
+      required: mode === "none",
+      note: usingSsws
+        ? "Active — sent as Authorization: SSWS"
+        : "Classic SSWS token; used when no usable private JWK is configured",
+    },
+    {
       key: "OKTA_CLIENT_ID",
       present: Boolean(oktaClientId()),
-      required: !oktaApiToken(),
-      note: "API Services app client id (private_key_jwt)",
+      required: false,
+      note: usingSsws
+        ? "Not used while the SSWS token is active"
+        : "API Services app client id (private_key_jwt)",
     },
     {
       key: "OKTA_PRIVATE_JWK",
       // A placeholder is worse than nothing — it fails at signing time.
-      present: Boolean(oktaPrivateJwk()) && !oktaJwkLooksPlaceholder(),
-      required: !oktaApiToken(),
-      note: oktaJwkLooksPlaceholder()
-        ? "Currently a placeholder — paste the real private JWK from Okta"
-        : "Private JWK used to sign the client assertion",
-    },
-    {
-      key: "OKTA_API_TOKEN",
-      present: Boolean(oktaApiToken()),
+      present: oktaJwkUsable(),
       required: false,
-      note: "Legacy SSWS token — only used when no JWK is configured",
+      note: usingSsws
+        ? "Not used while the SSWS token is active"
+        : oktaJwkLooksPlaceholder()
+          ? "Currently a placeholder — paste the real private JWK, or set OKTA_API_TOKEN instead"
+          : "Private JWK used to sign the client assertion",
     },
     {
       key: "VERCEL_API_TOKEN",
@@ -111,7 +139,7 @@ export function configStatus(): ConfigCheck[] {
       required: true,
       note: "Shared key callers send as x-api-key",
     },
-  ].map((c) => (hasJwk && c.key === "OKTA_API_TOKEN" ? { ...c, required: false } : c))
+  ]
 }
 
 export function missingRequired(): string[] {

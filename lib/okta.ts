@@ -1,6 +1,6 @@
 import "server-only"
 
-import { oktaOrgUrl } from "@/lib/env"
+import { oktaAuthMode, oktaOrgUrl } from "@/lib/env"
 import { ServiceError, notConfigured } from "@/lib/errors"
 import { invalidateOktaToken, oktaAuthHeader } from "@/lib/okta-token"
 
@@ -88,7 +88,10 @@ async function oktaFetch<T>(
   }
 
   let res = await send()
-  if (res.status === 401 && retryOn401) {
+  // Only worth retrying when we mint our own token — a 401 there usually means
+  // the cached access token was revoked early. An SSWS token is static, so a
+  // retry would just replay the same rejected request.
+  if (res.status === 401 && retryOn401 && oktaAuthMode() === "jwt") {
     invalidateOktaToken()
     res = await send()
   }

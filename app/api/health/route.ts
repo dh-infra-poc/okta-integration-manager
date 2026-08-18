@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { configStatus, missingRequired } from "@/lib/env"
+import { configStatus, missingRequired, oktaAuthMode } from "@/lib/env"
 
 export const dynamic = "force-dynamic"
 
@@ -10,6 +10,8 @@ export async function GET() {
   return NextResponse.json(
     {
       status: missing.length === 0 ? "ok" : "not_configured",
+      // Which credential Okta calls will actually use: "ssws", "jwt" or "none".
+      oktaAuthMode: oktaAuthMode(),
       missing,
       config: configStatus().map(({ key, present, required }) => ({ key, present, required })),
     },

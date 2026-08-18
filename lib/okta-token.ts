@@ -2,18 +2,30 @@ import "server-only"
 
 import { SignJWT, importJWK, type JWK } from "jose"
 
-import { oktaApiToken, oktaClientId, oktaOrgUrl, oktaPrivateJwk } from "@/lib/env"
+import {
+  oktaApiToken,
+  oktaAuthMode,
+  oktaClientId,
+  oktaJwkLooksPlaceholder,
+  oktaOrgUrl,
+  oktaPrivateJwk,
+} from "@/lib/env"
 import { ServiceError, notConfigured } from "@/lib/errors"
 
 /**
- * Okta Management API authorization.
+ * Okta Management API authorization. Two supported modes:
  *
- * Preferred path: an API Services (machine-to-machine) app using
- * private_key_jwt. We sign a client assertion with the configured private JWK
- * and exchange it at the ORG authorization server (`/oauth2/v1/token`) — never
- * `/oauth2/default`, which cannot issue Management API scopes.
+ * 1. `ssws` — a classic API token sent as `Authorization: SSWS <token>`. The
+ *    simplest setup, and the right choice for a prototype. The trade-off is
+ *    real: the token is long-lived, carries the full permissions of the admin
+ *    account that created it, and cannot be scoped down. Issue it from a
+ *    dedicated service account and rotate it deliberately.
  *
- * Fallback: a classic SSWS API token, if that is all the operator configured.
+ * 2. `jwt` — an API Services (machine-to-machine) app using private_key_jwt.
+ *    We sign a client assertion with the private JWK and exchange it at the
+ *    ORG authorization server (`/oauth2/v1/token`) — never `/oauth2/default`,
+ *    which cannot issue Management API scopes. Tokens are short-lived and the
+ *    grant is scope-limited, so prefer this before anything reaches production.
  */
 
 export const OKTA_SCOPES = [
@@ -126,19 +138,34 @@ async function fetchAccessToken(): Promise<CachedToken> {
   }
 }
 
-/** Returns the Authorization header value for a Management API call. */
+/**
+ * Returns the Authorization header value for a Management API call.
+ *
+ * Mode selection lives in `oktaAuthMode()` so the UI, the health endpoint and
+ * this call site can never disagree about which credential is in play.
+ */
 export async function oktaAuthHeader(): Promise<string> {
-  if (oktaClientId() && oktaPrivateJwk()) {
-    if (!cached || cached.expiresAt <= Date.now()) {
-      cached = await fetchAccessToken()
+  switch (oktaAuthMode()) {
+    case "jwt": {
+      if (!cached || cached.expiresAt <= Date.now()) {
+        cached = await fetchAccessToken()
+      }
+      return `Bearer ${cached.value}`
     }
-    return `Bearer ${cached.value}`
+    case "ssws":
+      return `SSWS ${oktaApiToken()}`
+    default:
+      // Distinguish "nothing configured" from "configured, but with the
+      // placeholder JWK still in place" — the fixes are different.
+      if (oktaJwkLooksPlaceholder()) {
+        throw new ServiceError(
+          503,
+          "okta_jwk_placeholder",
+          "OKTA_PRIVATE_JWK is still a placeholder. Either paste the real private JWK, or set OKTA_API_TOKEN to use a classic SSWS token instead.",
+        )
+      }
+      throw notConfigured(["OKTA_API_TOKEN"])
   }
-
-  const ssws = oktaApiToken()
-  if (ssws) return `SSWS ${ssws}`
-
-  throw notConfigured(["OKTA_CLIENT_ID", "OKTA_PRIVATE_JWK"])
 }
 
 /** Drops the cached token — used after a 401 so the next call re-mints. */
